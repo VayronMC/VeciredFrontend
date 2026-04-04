@@ -1,4 +1,4 @@
-# VeriredFrontend
+# VeciredFrontend
 Este repositorio contiene la interfaz de usuario (Frontend) del proyecto **Vecired**, una plataforma diseñada para conectar a los residentes de un conjunto residenciañ, facilitando el intercambio de servicios, favores y préstamos.
 
 ## 🛠️ Stack Tecnológico Definido
