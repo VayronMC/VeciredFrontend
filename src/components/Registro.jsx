@@ -1,6 +1,6 @@
 import { useState } from 'react';
 
-const Registro = () => {
+const Registro = ({ onSwitchToLogin }) => {
   const [formData, setFormData] = useState({
     nombre_completo: '',
     correo_electronico: '',
@@ -11,6 +11,7 @@ const Registro = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const [previewImage, setPreviewImage] = useState(null);
+  const [showSuccessAlert, setShowSuccessAlert] = useState(false);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -41,21 +42,15 @@ const Registro = () => {
     e.preventDefault();
     setIsLoading(true);
     setError('');
+    setSuccess('');
 
     try {
-      const formDataToSend = new FormData();
-      formDataToSend.append('nombre_completo', formData.nombre_completo);
-      formDataToSend.append('correo_electronico', formData.correo_electronico);
-      formDataToSend.append('direccion', formData.direccion);
-      formDataToSend.append('contraseña', formData.contraseña);
-      
-      if (formData.foto_perfil) {
-        formDataToSend.append('foto_perfil', formData.foto_perfil);
-      }
-
       const response = await fetch(`${import.meta.env.VITE_API_URL}/api/auth/register`, {
         method: 'POST',
-        body: formDataToSend
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(formData),
       });
 
       const data = await response.json();
@@ -64,18 +59,17 @@ const Registro = () => {
         throw new Error(data.error || 'Error al registrar usuario');
       }
 
-      // Mostrar mensaje de éxito y limpiar formulario
-      alert('¡Cuenta creada exitosamente!');
-      setFormData({
-        nombre_completo: '',
-        correo_electronico: '',
-        direccion: '',
-        contraseña: '',
-        foto_perfil: null
-      });
-      setPreviewImage(null);
-    } catch (err) {
-      setError(err.message);
+      // Mostrar alerta de éxito
+      setSuccess('¡Usuario registrado exitosamente! Redirigiendo al login...');
+      
+      // Redirigir automáticamente después de 2 segundos
+      setTimeout(() => {
+        onSwitchToLogin();
+      }, 2000);
+
+    } catch (error) {
+      setError(error.message || 'Error al registrar usuario');
+      setSuccess('');
     } finally {
       setIsLoading(false);
     }
@@ -83,6 +77,21 @@ const Registro = () => {
 
   return (
     <div className="min-h-screen bg-emerald-50 flex items-center justify-center px-4 py-8">
+      {/* Alerta de éxito */}
+      {showSuccessAlert && (
+        <div className="fixed top-4 left-1/2 transform -translate-x-1/2 z-50 animate-pulse">
+          <div className="bg-green-100 border border-green-400 text-green-700 px-6 py-4 rounded-lg shadow-lg flex items-center space-x-3">
+            <svg className="w-6 h-6 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+            </svg>
+            <div>
+              <p className="font-medium">¡Usuario registrado exitosamente!</p>
+              <p className="text-sm text-green-600">Redirigiendo al inicio de sesión...</p>
+            </div>
+          </div>
+        </div>
+      )}
+      
       <div className="w-full max-w-md">
         {/* Formulario */}
         <div className="bg-white rounded-lg shadow-md p-8">
@@ -225,6 +234,7 @@ const Registro = () => {
           <div className="mt-6 text-center">
             <span className="text-gray-300">¿Ya tienes cuenta? </span>
             <button
+              onClick={onSwitchToLogin}
               className="text-blue-600 hover:underline font-medium"
             >
               Iniciar Sesión
