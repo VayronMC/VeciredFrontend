@@ -10,8 +10,8 @@ const Registro = ({ onSwitchToLogin }) => {
   });
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
   const [previewImage, setPreviewImage] = useState(null);
-  const [showSuccessAlert, setShowSuccessAlert] = useState(false);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -59,7 +59,7 @@ const Registro = ({ onSwitchToLogin }) => {
         throw new Error(data.error || 'Error al registrar usuario');
       }
 
-      // Mostrar alerta de éxito
+      // Mostrar mensaje de éxito
       setSuccess('¡Usuario registrado exitosamente! Redirigiendo al login...');
       
       // Redirigir automáticamente después de 2 segundos
@@ -78,7 +78,7 @@ const Registro = ({ onSwitchToLogin }) => {
   return (
     <div className="min-h-screen bg-emerald-50 flex items-center justify-center px-4 py-8">
       {/* Alerta de éxito */}
-      {showSuccessAlert && (
+      {success && (
         <div className="fixed top-4 left-1/2 transform -translate-x-1/2 z-50 animate-pulse">
           <div className="bg-green-100 border border-green-400 text-green-700 px-6 py-4 rounded-lg shadow-lg flex items-center space-x-3">
             <svg className="w-6 h-6 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
