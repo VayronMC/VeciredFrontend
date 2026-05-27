@@ -24,15 +24,15 @@ const Registro = ({ onSwitchToLogin }) => {
   const handleImageChange = (e) => {
     const file = e.target.files[0];
     if (file) {
-      setFormData(prev => ({
-        ...prev,
-        foto_perfil: file
-      }));
-      
-      // Crear preview de la imagen
+      // Convertir imagen a base64
       const reader = new FileReader();
       reader.onloadend = () => {
-        setPreviewImage(reader.result);
+        const base64String = reader.result;
+        setFormData(prev => ({
+          ...prev,
+          foto_perfil: base64String
+        }));
+        setPreviewImage(base64String);
       };
       reader.readAsDataURL(file);
     }

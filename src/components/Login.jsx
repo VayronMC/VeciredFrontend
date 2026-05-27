@@ -1,6 +1,6 @@
 import { useState } from 'react';
 
-const Login = ({ onSwitchToRegister }) => {
+const Login = ({ onSwitchToRegister, onLoginSuccess }) => {
   const [formData, setFormData] = useState({
     correo_electronico: '',
     contraseña: ''
@@ -38,7 +38,6 @@ const Login = ({ onSwitchToRegister }) => {
         throw new Error(data.error || 'Error al iniciar sesión');
       }
 
-      // Guardar tokens en localStorage
       localStorage.setItem('access_token', data.session.access_token);
       localStorage.setItem('refresh_token', data.session.refresh_token);
       localStorage.setItem('user_data', JSON.stringify(data.user));
@@ -47,13 +46,16 @@ const Login = ({ onSwitchToRegister }) => {
       setSuccess('¡Sesión iniciada exitosamente!');
       setError('');
       
-      // Limpiar formulario
+      if (onLoginSuccess) {
+        onLoginSuccess();
+      }
+      
       setFormData({
         correo_electronico: '',
         contraseña: ''
       });
 
-    } catch (error) {
+    } catch {
       setError('Correo o contraseña incorrectos. Crea una cuenta si no la tienes aún.');
       setSuccess('');
     } finally {
