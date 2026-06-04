@@ -12,13 +12,17 @@ const Home = ({ onSwitchToProfile, onSwitchToNewPublication, onLogout }) => {
   const [notificationsLoading, setNotificationsLoading] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
   const [readNotificationIds, setReadNotificationIds] = useState(() => {
-    const saved = sessionStorage.getItem('readNotificationIds');
+    const userInfo = sessionStorage.getItem('user_data');
+    if (!userInfo) return [];
+    const user = JSON.parse(userInfo);
+    const saved = localStorage.getItem(`readNotificationIds_${user.id}`);
     return saved ? JSON.parse(saved) : [];
   });
   const [userData, setUserData] = useState(() => {
     const userInfo = sessionStorage.getItem('user_data');
     return userInfo ? JSON.parse(userInfo) : null;
   });
+  const [requestError, setRequestError] = useState('');
 
   // Recargar userData cuando el componente se monta o cuando se activa
   useEffect(() => {
@@ -105,6 +109,7 @@ const Home = ({ onSwitchToProfile, onSwitchToNewPublication, onLogout }) => {
 
   const handleRequestClick = (publication) => {
     setSelectedPublication(publication);
+    setRequestError('');
     setShowRequestModal(true);
   };
 
@@ -126,19 +131,26 @@ const Home = ({ onSwitchToProfile, onSwitchToNewPublication, onLogout }) => {
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.error || 'Error al crear solicitud');
+        if (response.status === 409) {
+          setRequestError('Ya has tomado esta publicación');
+        } else {
+          setRequestError(data.error || 'Error al crear solicitud');
+        }
+        return;
       }
 
       setShowRequestModal(false);
       setSelectedPublication(null);
+      setRequestError('');
     } catch (err) {
-      setError(err.message);
+      setRequestError(err.message);
     }
   };
 
   const handleCancelRequest = () => {
     setShowRequestModal(false);
     setSelectedPublication(null);
+    setRequestError('');
   };
 
   const fetchNotifications = useCallback(async () => {
@@ -192,9 +204,12 @@ const Home = ({ onSwitchToProfile, onSwitchToNewPublication, onLogout }) => {
     return () => clearTimeout(timeoutId);
   }, [fetchNotifications]);
 
-  // Guardar readNotificationIds en sessionStorage cuando cambia
+  // Guardar readNotificationIds en localStorage cuando cambia
   useEffect(() => {
-    sessionStorage.setItem('readNotificationIds', JSON.stringify(readNotificationIds));
+    const userInfo = sessionStorage.getItem('user_data');
+    if (!userInfo) return;
+    const user = JSON.parse(userInfo);
+    localStorage.setItem(`readNotificationIds_${user.id}`, JSON.stringify(readNotificationIds));
   }, [readNotificationIds]);
 
   const toggleNotifications = () => {
@@ -429,6 +444,11 @@ const Home = ({ onSwitchToProfile, onSwitchToNewPublication, onLogout }) => {
             <p className="text-gray-700 mb-6">
               Al aceptar lo podrás ver en "Servicios, Favores y Préstamos solicitados" en tu perfil
             </p>
+            {requestError && (
+              <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
+                <p className="text-red-700 text-sm">{requestError}</p>
+              </div>
+            )}
             <div className="flex gap-3">
               <button
                 onClick={handleConfirmRequest}
