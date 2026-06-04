@@ -29,6 +29,14 @@ const Perfil = ({ userId, onBack, onLogout, isOwnProfile = true }) => {
   });
   const [publicationPhotoPreview, setPublicationPhotoPreview] = useState('');
   const [inactivePublications, setInactivePublications] = useState([]);
+  const [showRatingModal, setShowRatingModal] = useState(false);
+  const [selectedRequest, setSelectedRequest] = useState(null);
+  const [ratingForm, setRatingForm] = useState({
+    calificacion: 0,
+    comentario: ''
+  });
+  const [hoveredRating, setHoveredRating] = useState(0);
+  const [resenas, setResenas] = useState([]);
 
   const fetchProfile = useCallback(async () => {
     try {
@@ -102,15 +110,30 @@ const Perfil = ({ userId, onBack, onLogout, isOwnProfile = true }) => {
     }
   }, [userId, isOwnProfile]);
 
+  const fetchResenas = useCallback(async () => {
+    try {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/resenas/user/${userId}`);
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Error al cargar reseñas');
+      }
+
+      setResenas(data.resenas || []);
+    } catch (err) {
+      console.error('Error al cargar reseñas:', err);
+    }
+  }, [userId]);
+
   useEffect(() => {
     const loadData = async () => {
       setLoading(true);
-      await Promise.all([fetchProfile(), fetchPublications(), fetchRequests(), fetchInactivePublications()]);
+      await Promise.all([fetchProfile(), fetchPublications(), fetchRequests(), fetchInactivePublications(), fetchResenas()]);
       setLoading(false);
     };
 
     loadData();
-  }, [fetchProfile, fetchPublications, fetchRequests, fetchInactivePublications]);
+  }, [fetchProfile, fetchPublications, fetchRequests, fetchInactivePublications, fetchResenas]);
 
   const handleEditSubmit = async (e) => {
     e.preventDefault();
@@ -315,6 +338,80 @@ const Perfil = ({ userId, onBack, onLogout, isOwnProfile = true }) => {
       // Recargar las publicaciones para asegurar consistencia
       await fetchPublications();
       await fetchInactivePublications();
+    } catch (err) {
+      setError(err.message);
+    }
+  };
+
+  const handleOpenRatingModal = (request) => {
+    setSelectedRequest(request);
+    setRatingForm({ calificacion: 0, comentario: '' });
+    setHoveredRating(0);
+    setShowRatingModal(true);
+  };
+
+  const handleCloseRatingModal = () => {
+    setShowRatingModal(false);
+    setSelectedRequest(null);
+    setRatingForm({ calificacion: 0, comentario: '' });
+    setHoveredRating(0);
+  };
+
+  const handleRatingSubmit = async () => {
+    if (!selectedRequest) return;
+
+    try {
+      const userData = JSON.parse(sessionStorage.getItem('user_data') || '{}');
+      
+      // Primero actualizar la solicitud a 'completada'
+      await fetch(`${import.meta.env.VITE_API_URL}/api/resenas/solicitud/${selectedRequest.id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ estado: 'completada' })
+      });
+
+      // Luego crear la reseña si hay calificación
+      if (ratingForm.calificacion > 0) {
+        await fetch(`${import.meta.env.VITE_API_URL}/api/resenas`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            usuario_id: userData.id,
+            evaluado_id: selectedRequest.publicaciones.usuario_id,
+            publicacion_id: selectedRequest.publicacion_id,
+            solicitud_id: selectedRequest.id,
+            calificacion: ratingForm.calificacion,
+            comentario: ratingForm.comentario
+          })
+        });
+      }
+
+      handleCloseRatingModal();
+      await fetchRequests();
+    } catch (err) {
+      setError(err.message);
+    }
+  };
+
+  const handleSkipRating = async () => {
+    if (!selectedRequest) return;
+
+    try {
+      // Solo actualizar la solicitud a 'completada'
+      await fetch(`${import.meta.env.VITE_API_URL}/api/resenas/solicitud/${selectedRequest.id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ estado: 'completada' })
+      });
+
+      handleCloseRatingModal();
+      await fetchRequests();
     } catch (err) {
       setError(err.message);
     }
@@ -590,6 +687,45 @@ const Perfil = ({ userId, onBack, onLogout, isOwnProfile = true }) => {
           </div>
         )}
 
+        {/* Sección 6: Reseñas */}
+        {resenas.length > 0 && (
+          <div className="bg-white rounded-lg shadow-md p-6">
+            <h3 className="text-xl font-bold text-gray-900 mb-4">Reseñas recibidas</h3>
+            <div className="space-y-4">
+              {resenas.map((resena) => (
+                <div key={resena.id} className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                  <div className="flex items-start mb-3">
+                    {resena.perfiles?.foto_url && (
+                      <img
+                        src={resena.perfiles.foto_url}
+                        alt={resena.perfiles.nombre_completo}
+                        className="w-10 h-10 rounded-full object-cover mr-3"
+                      />
+                    )}
+                    <div className="flex-1">
+                      <h4 className="font-semibold text-gray-900">{resena.perfiles?.nombre_completo}</h4>
+                      <p className="text-sm text-gray-600">{resena.publicaciones?.titulo}</p>
+                    </div>
+                    <div className="flex">
+                      {[1, 2, 3, 4, 5].map((star) => (
+                        <Star
+                          key={star}
+                          className={`w-4 h-4 ${
+                            star <= resena.calificacion ? 'text-black fill-black' : 'text-gray-300'
+                          }`}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                  {resena.comentario && (
+                    <p className="text-gray-700 text-sm">{resena.comentario}</p>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Sección 5: Servicios, Favores y Préstamos solicitados */}
         {isOwnProfile && (
           <div className="bg-white rounded-lg shadow-md p-6">
@@ -617,6 +753,7 @@ const Perfil = ({ userId, onBack, onLogout, isOwnProfile = true }) => {
                     <h4 className="font-bold text-gray-900 mb-2">{req.publicaciones?.titulo}</h4>
                     <p className="text-gray-600 text-sm mb-3">{req.publicaciones?.descripcion}</p>
                     <button
+                      onClick={() => handleOpenRatingModal(req)}
                       className="w-full px-4 py-2 bg-emerald-500 text-white rounded-md hover:bg-emerald-600 transition-colors"
                     >
                       Finalizar y calificar
@@ -743,6 +880,74 @@ const Perfil = ({ userId, onBack, onLogout, isOwnProfile = true }) => {
                   Cancelar
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de calificación */}
+      {showRatingModal && selectedRequest && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+            <div className="flex items-center mb-4">
+              {selectedRequest.publicaciones?.perfiles?.foto_url && (
+                <img
+                  src={selectedRequest.publicaciones.perfiles.foto_url}
+                  alt={selectedRequest.publicaciones.perfiles.nombre_completo}
+                  className="w-12 h-12 rounded-full object-cover mr-3"
+                />
+              )}
+              <div>
+                <h3 className="font-bold text-gray-900">{selectedRequest.publicaciones?.perfiles?.nombre_completo}</h3>
+                <p className="text-sm text-gray-600">{selectedRequest.publicaciones?.titulo}</p>
+              </div>
+            </div>
+            
+            <h4 className="text-lg font-semibold text-gray-900 mb-4">¿Cómo fue tu experiencia?</h4>
+            
+            <div className="flex gap-2 mb-4">
+              {[1, 2, 3, 4, 5].map((star) => (
+                <Star
+                  key={star}
+                  className={`w-8 h-8 cursor-pointer transition-colors ${
+                    star <= (hoveredRating || ratingForm.calificacion) ? 'text-black fill-black' : 'text-gray-300'
+                  }`}
+                  onMouseEnter={() => setHoveredRating(star)}
+                  onMouseLeave={() => setHoveredRating(0)}
+                  onClick={() => setRatingForm({ ...ratingForm, calificacion: star })}
+                />
+              ))}
+            </div>
+            
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-1">Comentario (Opcional)</label>
+              <textarea
+                value={ratingForm.comentario}
+                onChange={(e) => setRatingForm({ ...ratingForm, comentario: e.target.value })}
+                placeholder="Cuéntanos más sobre tu experiencia..."
+                rows="3"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md bg-green-50 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+              />
+            </div>
+            
+            <div className="flex gap-3">
+              <button
+                onClick={handleSkipRating}
+                className="flex-1 px-4 py-2 bg-green-50 text-gray-700 rounded-lg border-2 border-emerald-600 hover:bg-green-100 transition-colors"
+              >
+                Saltar
+              </button>
+              <button
+                onClick={handleRatingSubmit}
+                disabled={ratingForm.calificacion === 0}
+                className={`flex-1 px-4 py-2 rounded-lg transition-colors ${
+                  ratingForm.calificacion === 0
+                    ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                    : 'bg-emerald-500 text-white hover:bg-emerald-600'
+                }`}
+              >
+                Enviar
+              </button>
             </div>
           </div>
         </div>
