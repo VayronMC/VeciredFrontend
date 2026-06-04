@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Login from './components/Login';
 import Registro from './components/Registro';
 import Home from './components/Home';
@@ -10,9 +10,28 @@ function App() {
   const userInfo = sessionStorage.getItem('user_data');
   
   const [currentView, setCurrentView] = useState(() => {
+    const savedView = sessionStorage.getItem('current_view');
+    if (savedView) {
+      return savedView;
+    }
     return (userToken && userInfo) ? 'home' : 'login';
   });
-  const [profileUserId, setProfileUserId] = useState(null);
+  const [profileUserId, setProfileUserId] = useState(() => {
+    const savedProfileUserId = sessionStorage.getItem('profile_user_id');
+    return savedProfileUserId ? JSON.parse(savedProfileUserId) : null;
+  });
+
+  useEffect(() => {
+    sessionStorage.setItem('current_view', currentView);
+  }, [currentView]);
+
+  useEffect(() => {
+    if (profileUserId !== null) {
+      sessionStorage.setItem('profile_user_id', JSON.stringify(profileUserId));
+    } else {
+      sessionStorage.removeItem('profile_user_id');
+    }
+  }, [profileUserId]);
 
   const handleLoginSuccess = () => {
     setCurrentView('home');
@@ -47,7 +66,10 @@ function App() {
     sessionStorage.removeItem('access_token');
     sessionStorage.removeItem('refresh_token');
     sessionStorage.removeItem('user_data');
+    sessionStorage.removeItem('current_view');
+    sessionStorage.removeItem('profile_user_id');
     setCurrentView('login');
+    setProfileUserId(null);
   };
 
   return (

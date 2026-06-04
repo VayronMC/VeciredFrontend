@@ -28,6 +28,7 @@ const Perfil = ({ userId, onBack, onLogout, isOwnProfile = true }) => {
     foto_url: ''
   });
   const [publicationPhotoPreview, setPublicationPhotoPreview] = useState('');
+  const [inactivePublications, setInactivePublications] = useState([]);
 
   const fetchProfile = useCallback(async () => {
     try {
@@ -61,7 +62,7 @@ const Perfil = ({ userId, onBack, onLogout, isOwnProfile = true }) => {
         throw new Error(data.error || 'Error al obtener publicaciones');
       }
 
-      setPublications(data.publications || []);
+      setPublications((data.publications || []).filter(pub => pub.estado === 'activa'));
     } catch (err) {
       console.error('Error al cargar publicaciones:', err);
     }
@@ -84,15 +85,32 @@ const Perfil = ({ userId, onBack, onLogout, isOwnProfile = true }) => {
     }
   }, [userId, isOwnProfile]);
 
+  const fetchInactivePublications = useCallback(async () => {
+    if (!isOwnProfile) return;
+
+    try {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/publicaciones/user/${userId}`);
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Error al cargar publicaciones inactivas');
+      }
+
+      setInactivePublications((data.publications || []).filter(pub => pub.estado === 'inactiva'));
+    } catch (err) {
+      console.error('Error al cargar publicaciones inactivas:', err);
+    }
+  }, [userId, isOwnProfile]);
+
   useEffect(() => {
     const loadData = async () => {
       setLoading(true);
-      await Promise.all([fetchProfile(), fetchPublications(), fetchRequests()]);
+      await Promise.all([fetchProfile(), fetchPublications(), fetchRequests(), fetchInactivePublications()]);
       setLoading(false);
     };
 
     loadData();
-  }, [fetchProfile, fetchPublications, fetchRequests]);
+  }, [fetchProfile, fetchPublications, fetchRequests, fetchInactivePublications]);
 
   const handleEditSubmit = async (e) => {
     e.preventDefault();
@@ -266,6 +284,39 @@ const Perfil = ({ userId, onBack, onLogout, isOwnProfile = true }) => {
     } else {
       setShowEditModal(false);
       setEditingPublication(null);
+    }
+  };
+
+  const handleTogglePublicationStatus = async (publicationId, newStatus) => {
+    try {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/publicaciones/${publicationId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ estado: newStatus })
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Error al cambiar estado de publicación');
+      }
+
+      // Actualizar la lista de publicaciones
+      if (newStatus === 'inactiva') {
+        setPublications(publications.filter(pub => pub.id !== publicationId));
+        setInactivePublications([...inactivePublications, data.publication]);
+      } else {
+        setInactivePublications(inactivePublications.filter(pub => pub.id !== publicationId));
+        setPublications([...publications, data.publication]);
+      }
+
+      // Recargar las publicaciones para asegurar consistencia
+      await fetchPublications();
+      await fetchInactivePublications();
+    } catch (err) {
+      setError(err.message);
     }
   };
 
@@ -477,6 +528,12 @@ const Perfil = ({ userId, onBack, onLogout, isOwnProfile = true }) => {
                         Editar
                       </button>
                       <button
+                        onClick={() => handleTogglePublicationStatus(pub.id, 'inactiva')}
+                        className="flex-1 px-4 py-2 bg-orange-500 text-white rounded-md hover:bg-orange-600 transition-colors"
+                      >
+                        Finalizar
+                      </button>
+                      <button
                         onClick={() => handleDeletePublication(pub.id)}
                         className="flex-1 px-4 py-2 bg-red-500 text-white rounded-md hover:bg-red-600 transition-colors"
                       >
@@ -487,6 +544,49 @@ const Perfil = ({ userId, onBack, onLogout, isOwnProfile = true }) => {
                 ))}
               </div>
             )}
+          </div>
+        )}
+
+        {/* Sección 4.5: Mis publicaciones inactivas */}
+        {isOwnProfile && inactivePublications.length > 0 && (
+          <div className="bg-white rounded-lg shadow-md p-6">
+            <h3 className="text-xl font-bold text-gray-900 mb-4">Mis publicaciones inactivas</h3>
+            <div className="flex gap-4 overflow-x-auto pb-4">
+              {inactivePublications.map((pub) => (
+                <div key={pub.id} className="flex-shrink-0 w-80 bg-gray-50 rounded-lg p-4 border border-gray-200 opacity-75">
+                  {pub.foto_url && (
+                    <img
+                      src={pub.foto_url}
+                      alt={pub.titulo}
+                      className="w-full h-48 object-contain rounded-lg mb-3"
+                    />
+                  )}
+                  <span className={`inline-block px-2 py-1 rounded-full text-xs mb-2 ${
+                    pub.categoria === 'Servicios' ? 'bg-blue-100 text-blue-800' :
+                    pub.categoria === 'Favores' ? 'bg-purple-100 text-purple-800' :
+                    'bg-yellow-100 text-yellow-800'
+                  }`}>
+                    {pub.categoria}
+                  </span>
+                  <h4 className="font-bold text-gray-900 mb-2">{pub.titulo}</h4>
+                  <p className="text-gray-600 text-sm mb-3">{pub.descripcion}</p>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => handleTogglePublicationStatus(pub.id, 'activa')}
+                      className="flex-1 px-4 py-2 bg-green-500 text-white rounded-md hover:bg-green-600 transition-colors"
+                    >
+                      Reactivar
+                    </button>
+                    <button
+                      onClick={() => handleDeletePublication(pub.id)}
+                      className="flex-1 px-4 py-2 bg-red-500 text-white rounded-md hover:bg-red-600 transition-colors"
+                    >
+                      Eliminar
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         )}
 
