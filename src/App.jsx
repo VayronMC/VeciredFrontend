@@ -3,6 +3,7 @@ import Login from './components/Login';
 import Registro from './components/Registro';
 import Home from './components/Home';
 import NuevaPublicacion from './components/NuevaPublicacion';
+import Perfil from './components/Perfil';
 
 function App() {
   const userToken = sessionStorage.getItem('access_token');
@@ -11,6 +12,7 @@ function App() {
   const [currentView, setCurrentView] = useState(() => {
     return (userToken && userInfo) ? 'home' : 'login';
   });
+  const [profileUserId, setProfileUserId] = useState(null);
 
   const handleLoginSuccess = () => {
     setCurrentView('home');
@@ -24,7 +26,8 @@ function App() {
     setCurrentView('login');
   };
 
-  const handleSwitchToProfile = () => {
+  const handleSwitchToProfile = (userId = null) => {
+    setProfileUserId(userId);
     setCurrentView('profile');
   };
 
@@ -38,14 +41,6 @@ function App() {
 
   const handlePublishSuccess = () => {
     setCurrentView('home');
-  };
-
-  const handleSwitchToContact = (publicationId) => {
-    setCurrentView('contact');
-    // Guardar el ID de la publicación para la vista de contacto
-    if (publicationId) {
-      sessionStorage.setItem('selectedPublicationId', publicationId);
-    }
   };
 
   const handleLogout = () => {
@@ -72,7 +67,6 @@ function App() {
         <Home 
           onSwitchToProfile={handleSwitchToProfile}
           onSwitchToNewPublication={handleSwitchToNewPublication}
-          onSwitchToContact={handleSwitchToContact}
           onLogout={handleLogout}
         />
       )}
@@ -80,6 +74,14 @@ function App() {
         <NuevaPublicacion 
           onBack={handleSwitchToHome}
           onPublishSuccess={handlePublishSuccess}
+        />
+      )}
+      {currentView === 'profile' && (
+        <Perfil 
+          userId={profileUserId || JSON.parse(userInfo || '{}').id}
+          onBack={handleSwitchToHome}
+          onLogout={handleLogout}
+          isOwnProfile={!profileUserId || profileUserId === JSON.parse(userInfo || '{}').id}
         />
       )}
     </div>
