@@ -18,6 +18,16 @@ const Perfil = ({ userId, onBack, onLogout, isOwnProfile = true }) => {
   const [photoPreview, setPhotoPreview] = useState('');
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [selectedPublicationId, setSelectedPublicationId] = useState(null);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editingPublication, setEditingPublication] = useState(null);
+  const [publicationEditForm, setPublicationEditForm] = useState({
+    titulo: '',
+    descripcion: '',
+    categoria: 'Servicio',
+    telefono: '',
+    foto_url: ''
+  });
+  const [publicationPhotoPreview, setPublicationPhotoPreview] = useState('');
 
   const fetchProfile = useCallback(async () => {
     try {
@@ -169,6 +179,94 @@ const Perfil = ({ userId, onBack, onLogout, isOwnProfile = true }) => {
   const handleRemovePhoto = () => {
     setPhotoPreview('');
     setEditForm({ ...editForm, foto_url: '' });
+  };
+
+  const handleEditPublication = (publication) => {
+    setEditingPublication(publication);
+    setPublicationEditForm({
+      titulo: publication.titulo || '',
+      descripcion: publication.descripcion || '',
+      categoria: publication.categoria || 'Servicio',
+      telefono: publication.telefono || '',
+      foto_url: publication.foto_url || ''
+    });
+    setPublicationPhotoPreview(publication.foto_url || '');
+    setShowEditModal(true);
+  };
+
+  const handlePublicationPhotoChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setPublicationPhotoPreview(reader.result);
+        setPublicationEditForm({ ...publicationEditForm, foto_url: reader.result });
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleRemovePublicationPhoto = () => {
+    setPublicationPhotoPreview('');
+    setPublicationEditForm({ ...publicationEditForm, foto_url: '' });
+  };
+
+  const handleSavePublication = async () => {
+    if (!editingPublication) return;
+
+    try {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/publicaciones/${editingPublication.id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          titulo: publicationEditForm.titulo,
+          descripcion: publicationEditForm.descripcion,
+          categoria: publicationEditForm.categoria,
+          telefono: publicationEditForm.telefono,
+          foto_url: publicationEditForm.foto_url
+        })
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Error al actualizar publicación');
+      }
+
+      // Actualizar la publicación en la lista local
+      setPublications(publications.map(pub => 
+        pub.id === editingPublication.id ? data.publication : pub
+      ));
+
+      setShowEditModal(false);
+      setEditingPublication(null);
+    } catch (err) {
+      setError(err.message);
+    }
+  };
+
+  const handleCancelEditPublication = () => {
+    // Verificar si hay cambios sin guardar
+    const hasChanges = 
+      publicationEditForm.titulo !== editingPublication?.titulo ||
+      publicationEditForm.descripcion !== editingPublication?.descripcion ||
+      publicationEditForm.categoria !== editingPublication?.categoria ||
+      publicationEditForm.telefono !== editingPublication?.telefono ||
+      publicationEditForm.foto_url !== editingPublication?.foto_url;
+
+    if (hasChanges) {
+      if (window.confirm('Tienes cambios sin guardar. ¿Deseas guardar antes de salir?')) {
+        handleSavePublication();
+      } else {
+        setShowEditModal(false);
+        setEditingPublication(null);
+      }
+    } else {
+      setShowEditModal(false);
+      setEditingPublication(null);
+    }
   };
 
   if (loading) {
@@ -359,7 +457,7 @@ const Perfil = ({ userId, onBack, onLogout, isOwnProfile = true }) => {
                       <img
                         src={pub.foto_url}
                         alt={pub.titulo}
-                        className="w-full h-32 object-cover rounded-lg mb-3"
+                        className="w-full h-48 object-contain rounded-lg mb-3"
                       />
                     )}
                     <span className={`inline-block px-2 py-1 rounded-full text-xs mb-2 ${
@@ -371,12 +469,20 @@ const Perfil = ({ userId, onBack, onLogout, isOwnProfile = true }) => {
                     </span>
                     <h4 className="font-bold text-gray-900 mb-2">{pub.titulo}</h4>
                     <p className="text-gray-600 text-sm mb-3">{pub.descripcion}</p>
-                    <button
-                      onClick={() => handleDeletePublication(pub.id)}
-                      className="w-full px-4 py-2 bg-red-500 text-white rounded-md hover:bg-red-600 transition-colors"
-                    >
-                      Eliminar
-                    </button>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => handleEditPublication(pub)}
+                        className="flex-1 px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 transition-colors"
+                      >
+                        Editar
+                      </button>
+                      <button
+                        onClick={() => handleDeletePublication(pub.id)}
+                        className="flex-1 px-4 py-2 bg-red-500 text-white rounded-md hover:bg-red-600 transition-colors"
+                      >
+                        Eliminar
+                      </button>
+                    </div>
                   </div>
                 ))}
               </div>
@@ -398,7 +504,7 @@ const Perfil = ({ userId, onBack, onLogout, isOwnProfile = true }) => {
                       <img
                         src={req.publicaciones.foto_url}
                         alt={req.publicaciones.titulo}
-                        className="w-full h-32 object-cover rounded-lg mb-3"
+                        className="w-full h-48 object-contain rounded-lg mb-3"
                       />
                     )}
                     <span className={`inline-block px-2 py-1 rounded-full text-xs mb-2 ${
@@ -444,6 +550,99 @@ const Perfil = ({ userId, onBack, onLogout, isOwnProfile = true }) => {
               >
                 Cancelar
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de edición de publicación */}
+      {showEditModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+            <h3 className="text-xl font-bold text-gray-900 mb-4">Editar publicación</h3>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Categoría</label>
+                <select
+                  value={publicationEditForm.categoria}
+                  onChange={(e) => setPublicationEditForm({ ...publicationEditForm, categoria: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md bg-green-50 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                >
+                  <option value="Servicios">Servicios</option>
+                  <option value="Favores">Favores</option>
+                  <option value="Préstamos">Préstamos</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Título</label>
+                <input
+                  type="text"
+                  value={publicationEditForm.titulo}
+                  onChange={(e) => setPublicationEditForm({ ...publicationEditForm, titulo: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md bg-green-50 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Foto</label>
+                <div className="flex items-center gap-4">
+                  {publicationPhotoPreview && (
+                    <img
+                      src={publicationPhotoPreview}
+                      alt="Preview"
+                      className="w-20 h-20 rounded-lg object-cover border-2 border-emerald-500"
+                    />
+                  )}
+                  <div className="flex-1">
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={handlePublicationPhotoChange}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md bg-cyan-50 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                    />
+                    {publicationPhotoPreview && (
+                      <button
+                        type="button"
+                        onClick={handleRemovePublicationPhoto}
+                        className="mt-2 px-3 py-1 bg-red-500 text-white text-sm rounded-md hover:bg-red-600 transition-colors"
+                      >
+                        Quitar foto
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Descripción</label>
+                <textarea
+                  value={publicationEditForm.descripcion}
+                  onChange={(e) => setPublicationEditForm({ ...publicationEditForm, descripcion: e.target.value })}
+                  rows="3"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md bg-green-50 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Teléfono</label>
+                <input
+                  type="text"
+                  value={publicationEditForm.telefono}
+                  onChange={(e) => setPublicationEditForm({ ...publicationEditForm, telefono: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md bg-green-50 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                />
+              </div>
+              <div className="flex gap-3">
+                <button
+                  onClick={handleSavePublication}
+                  className="flex-1 px-4 py-2 bg-emerald-500 text-white rounded-lg border-2 border-emerald-600 hover:bg-emerald-600 transition-colors"
+                >
+                  Guardar
+                </button>
+                <button
+                  onClick={handleCancelEditPublication}
+                  className="flex-1 px-4 py-2 bg-black text-white rounded-lg hover:bg-gray-800 transition-colors"
+                >
+                  Cancelar
+                </button>
+              </div>
             </div>
           </div>
         </div>
