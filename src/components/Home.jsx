@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Search, Bell, Plus, X, LogOut } from 'lucide-react';
 
-const Home = ({ onSwitchToProfile, onSwitchToNewPublication, onSwitchToContact, onLogout }) => {
+const Home = ({ onSwitchToProfile, onSwitchToNewPublication, onLogout }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [activeFilter, setActiveFilter] = useState(null);
   const [publications, setPublications] = useState([]);
@@ -15,10 +15,40 @@ const Home = ({ onSwitchToProfile, onSwitchToNewPublication, onSwitchToContact, 
     const saved = sessionStorage.getItem('readNotificationIds');
     return saved ? JSON.parse(saved) : [];
   });
-  const [userData] = useState(() => {
+  const [userData, setUserData] = useState(() => {
     const userInfo = sessionStorage.getItem('user_data');
     return userInfo ? JSON.parse(userInfo) : null;
   });
+
+  // Recargar userData cuando el componente se monta o cuando se activa
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      const userInfo = sessionStorage.getItem('user_data');
+      if (userInfo) {
+        setUserData(JSON.parse(userInfo));
+      }
+    }, 0);
+    
+    return () => clearTimeout(timeoutId);
+  }, []);
+
+  // Listener para actualizar userData cuando se actualiza el perfil
+  useEffect(() => {
+    const handleProfileUpdate = () => {
+      const userInfo = sessionStorage.getItem('user_data');
+      if (userInfo) {
+        setUserData(JSON.parse(userInfo));
+      }
+    };
+
+    window.addEventListener('profileUpdated', handleProfileUpdate);
+
+    return () => {
+      window.removeEventListener('profileUpdated', handleProfileUpdate);
+    };
+  }, []);
+  const [showRequestModal, setShowRequestModal] = useState(false);
+  const [selectedPublication, setSelectedPublication] = useState(null);
 
   const fetchPublications = useCallback(async () => {
     setLoading(true);
@@ -72,10 +102,43 @@ const Home = ({ onSwitchToProfile, onSwitchToNewPublication, onSwitchToContact, 
     }
   };
 
-  const handleContactClick = (publicationId) => {
-    if (onSwitchToContact) {
-      onSwitchToContact(publicationId);
+
+  const handleRequestClick = (publication) => {
+    setSelectedPublication(publication);
+    setShowRequestModal(true);
+  };
+
+  const handleConfirmRequest = async () => {
+    if (!selectedPublication || !userData) return;
+
+    try {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/solicitudes`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          usuario_id: userData.id,
+          publicacion_id: selectedPublication.id
+        })
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Error al crear solicitud');
+      }
+
+      setShowRequestModal(false);
+      setSelectedPublication(null);
+    } catch (err) {
+      setError(err.message);
     }
+  };
+
+  const handleCancelRequest = () => {
+    setShowRequestModal(false);
+    setSelectedPublication(null);
   };
 
   const fetchNotifications = useCallback(async () => {
@@ -162,7 +225,7 @@ const Home = ({ onSwitchToProfile, onSwitchToNewPublication, onSwitchToContact, 
               />
             </div>
             <button
-              onClick={onSwitchToProfile}
+              onClick={() => onSwitchToProfile && onSwitchToProfile(userData?.id)}
               className="w-12 h-12 rounded-full overflow-hidden border-2 border-emerald-500 hover:border-emerald-600 transition-colors"
             >
               <img
@@ -302,14 +365,19 @@ const Home = ({ onSwitchToProfile, onSwitchToNewPublication, onSwitchToContact, 
               >
                 <div className="p-4">
                   <div className="flex items-center gap-3 mb-3">
-                    <img
-                      src={pub.perfiles?.foto_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(pub.perfiles?.nombre_completo || pub.perfiles?.correo_electronico?.split('@')[0] || 'Usuario')}&background=10b981&color=fff&size=150`}
-                      alt={pub.perfiles?.nombre_completo || pub.perfiles?.correo_electronico?.split('@')[0] || 'Usuario'}
-                      className="w-12 h-12 rounded-full object-cover border-2 border-gray-200"
-                      onError={(e) => {
-                        e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(pub.perfiles?.nombre_completo || pub.perfiles?.correo_electronico?.split('@')[0] || 'Usuario')}&background=10b981&color=fff&size=150`;
-                      }}
-                    />
+                    <button
+                      onClick={() => onSwitchToProfile && onSwitchToProfile(pub.perfiles?.id)}
+                      className="relative group"
+                    >
+                      <img
+                        src={pub.perfiles?.foto_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(pub.perfiles?.nombre_completo || pub.perfiles?.correo_electronico?.split('@')[0] || 'Usuario')}&background=10b981&color=fff&size=150`}
+                        alt={pub.perfiles?.nombre_completo || pub.perfiles?.correo_electronico?.split('@')[0] || 'Usuario'}
+                        className="w-12 h-12 rounded-full object-cover border-2 border-gray-200 group-hover:border-emerald-500 transition-colors"
+                        onError={(e) => {
+                          e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(pub.perfiles?.nombre_completo || pub.perfiles?.correo_electronico?.split('@')[0] || 'Usuario')}&background=10b981&color=fff&size=150`;
+                        }}
+                      />
+                    </button>
                     <div className="flex-1">
                       <p className="font-medium text-gray-900">{pub.perfiles?.nombre_completo || pub.perfiles?.correo_electronico?.split('@')[0] || 'Usuario'}</p>
                       <span className="inline-block px-2 py-1 rounded-full text-xs bg-emerald-100 text-emerald-700">
@@ -335,7 +403,7 @@ const Home = ({ onSwitchToProfile, onSwitchToNewPublication, onSwitchToContact, 
                   )}
 
                   <button
-                    onClick={() => handleContactClick(pub.id)}
+                    onClick={() => handleRequestClick(pub)}
                     className="w-full px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition-colors"
                   >
                     Lo tomé
@@ -352,6 +420,32 @@ const Home = ({ onSwitchToProfile, onSwitchToNewPublication, onSwitchToContact, 
           </div>
         )}
       </div>
+
+      {/* Modal de confirmación de solicitud */}
+      {showRequestModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+            <h3 className="text-xl font-bold text-gray-900 mb-4">¿Ya lo solicitaste?</h3>
+            <p className="text-gray-700 mb-6">
+              Al aceptar lo podrás ver en "Servicios, Favores y Préstamos solicitados" en tu perfil
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={handleConfirmRequest}
+                className="flex-1 px-4 py-2 bg-emerald-500 text-white rounded-lg border-2 border-emerald-600 hover:bg-emerald-600 transition-colors"
+              >
+                Aceptar
+              </button>
+              <button
+                onClick={handleCancelRequest}
+                className="flex-1 px-4 py-2 bg-black text-white rounded-lg hover:bg-gray-800 transition-colors"
+              >
+                Cancelar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
