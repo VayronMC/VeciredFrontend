@@ -10,8 +10,13 @@ const Home = ({ onSwitchToProfile, onSwitchToNewPublication, onSwitchToContact, 
   const [showNotifications, setShowNotifications] = useState(false);
   const [notifications, setNotifications] = useState([]);
   const [notificationsLoading, setNotificationsLoading] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [readNotificationIds, setReadNotificationIds] = useState(() => {
+    const saved = sessionStorage.getItem('readNotificationIds');
+    return saved ? JSON.parse(saved) : [];
+  });
   const [userData] = useState(() => {
-    const userInfo = localStorage.getItem('user_data');
+    const userInfo = sessionStorage.getItem('user_data');
     return userInfo ? JSON.parse(userInfo) : null;
   });
 
@@ -73,10 +78,10 @@ const Home = ({ onSwitchToProfile, onSwitchToNewPublication, onSwitchToContact, 
     }
   };
 
-  const fetchNotifications = async () => {
+  const fetchNotifications = useCallback(async () => {
     setNotificationsLoading(true);
     try {
-      const userInfo = localStorage.getItem('user_data');
+      const userInfo = sessionStorage.getItem('user_data');
       if (!userInfo) return;
 
       const user = JSON.parse(userInfo);
@@ -90,17 +95,54 @@ const Home = ({ onSwitchToProfile, onSwitchToNewPublication, onSwitchToContact, 
       }
 
       setNotifications(data.notifications || []);
+      // Contar solo notificaciones que no han sido leídas
+      const unreadNotifications = (data.notifications || []).filter(
+        notif => !readNotificationIds.includes(notif.id)
+      );
+      setUnreadCount(unreadNotifications.length);
     } catch (error) {
       console.error('Error al cargar notificaciones:', error);
     } finally {
       setNotificationsLoading(false);
     }
-  };
+  }, [readNotificationIds]);
+
+  // Listener para recargar notificaciones desde NuevaPublicacion
+  useEffect(() => {
+    const handleRefreshNotifications = () => {
+      fetchNotifications();
+    };
+
+    window.addEventListener('refreshNotifications', handleRefreshNotifications);
+
+    return () => {
+      window.removeEventListener('refreshNotifications', handleRefreshNotifications);
+    };
+  }, [fetchNotifications]);
+
+  // Cargar notificaciones automáticamente al iniciar Home
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      fetchNotifications();
+    }, 0);
+    
+    return () => clearTimeout(timeoutId);
+  }, [fetchNotifications]);
+
+  // Guardar readNotificationIds en sessionStorage cuando cambia
+  useEffect(() => {
+    sessionStorage.setItem('readNotificationIds', JSON.stringify(readNotificationIds));
+  }, [readNotificationIds]);
 
   const toggleNotifications = () => {
     setShowNotifications(!showNotifications);
     if (!showNotifications) {
       fetchNotifications();
+    } else {
+      // Marcar todas las notificaciones actuales como leídas
+      const currentIds = notifications.map(n => n.id);
+      setReadNotificationIds(prev => [...new Set([...prev, ...currentIds])]);
+      setUnreadCount(0);
     }
   };
 
@@ -138,7 +180,7 @@ const Home = ({ onSwitchToProfile, onSwitchToNewPublication, onSwitchToContact, 
                 className="relative p-3 hover:bg-gray-100 rounded-full transition-colors"
               >
                 <Bell className="w-6 h-6 text-gray-700" />
-                {notifications.length > 0 && (
+                {unreadCount > 0 && (
                   <span className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full"></span>
                 )}
               </button>
@@ -280,9 +322,11 @@ const Home = ({ onSwitchToProfile, onSwitchToNewPublication, onSwitchToContact, 
                     <img
                       src={pub.foto_url}
                       alt="Producto"
-                      className="w-full h-48 object-cover rounded-lg mb-3"
+                      className="w-full h-48 object-contain rounded-lg mb-3"
                     />
                   )}
+
+                  <h3 className="font-bold text-gray-900 mb-2">{pub.titulo}</h3>
 
                   <p className="text-gray-700 mb-2">{pub.descripcion}</p>
 
