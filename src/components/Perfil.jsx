@@ -37,6 +37,7 @@ const Perfil = ({ userId, onBack, onLogout, isOwnProfile = true }) => {
   });
   const [hoveredRating, setHoveredRating] = useState(0);
   const [resenas, setResenas] = useState([]);
+  const [showResenasModal, setShowResenasModal] = useState(false);
 
   const fetchProfile = useCallback(async () => {
     try {
@@ -350,6 +351,20 @@ const Perfil = ({ userId, onBack, onLogout, isOwnProfile = true }) => {
     setShowRatingModal(true);
   };
 
+  const handleOpenResenasModal = () => {
+    setShowResenasModal(true);
+  };
+
+  const handleCloseResenasModal = () => {
+    setShowResenasModal(false);
+  };
+
+  const calcularPromedioEstrellas = () => {
+    if (resenas.length === 0) return 0;
+    const suma = resenas.reduce((acc, resena) => acc + resena.calificacion, 0);
+    return (suma / resenas.length).toFixed(1);
+  };
+
   const handleCloseRatingModal = () => {
     setShowRatingModal(false);
     setSelectedRequest(null);
@@ -482,6 +497,7 @@ const Perfil = ({ userId, onBack, onLogout, isOwnProfile = true }) => {
 
               <div className="flex gap-3 mb-4">
                 <button
+                  onClick={handleOpenResenasModal}
                   className="flex items-center gap-2 px-4 py-2 rounded-lg bg-emerald-500 text-white border-2 border-emerald-600 hover:bg-emerald-600 transition-colors"
                 >
                   <Star className="w-4 h-4" />
@@ -681,45 +697,6 @@ const Perfil = ({ userId, onBack, onLogout, isOwnProfile = true }) => {
                       Eliminar
                     </button>
                   </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Sección 6: Reseñas */}
-        {resenas.length > 0 && (
-          <div className="bg-white rounded-lg shadow-md p-6">
-            <h3 className="text-xl font-bold text-gray-900 mb-4">Reseñas recibidas</h3>
-            <div className="space-y-4">
-              {resenas.map((resena) => (
-                <div key={resena.id} className="bg-gray-50 rounded-lg p-4 border border-gray-200">
-                  <div className="flex items-start mb-3">
-                    {resena.perfiles?.foto_url && (
-                      <img
-                        src={resena.perfiles.foto_url}
-                        alt={resena.perfiles.nombre_completo}
-                        className="w-10 h-10 rounded-full object-cover mr-3"
-                      />
-                    )}
-                    <div className="flex-1">
-                      <h4 className="font-semibold text-gray-900">{resena.perfiles?.nombre_completo}</h4>
-                      <p className="text-sm text-gray-600">{resena.publicaciones?.titulo}</p>
-                    </div>
-                    <div className="flex">
-                      {[1, 2, 3, 4, 5].map((star) => (
-                        <Star
-                          key={star}
-                          className={`w-4 h-4 ${
-                            star <= resena.calificacion ? 'text-black fill-black' : 'text-gray-300'
-                          }`}
-                        />
-                      ))}
-                    </div>
-                  </div>
-                  {resena.comentario && (
-                    <p className="text-gray-700 text-sm">{resena.comentario}</p>
-                  )}
                 </div>
               ))}
             </div>
@@ -948,6 +925,98 @@ const Perfil = ({ userId, onBack, onLogout, isOwnProfile = true }) => {
               >
                 Enviar
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de reseñas */}
+      {showResenasModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 overflow-y-auto">
+          <div className="bg-white rounded-lg max-w-2xl w-full mx-4 my-8">
+            {/* Header igual que en perfil */}
+            <div className="bg-white p-4 border-b border-gray-200 flex items-center justify-between">
+              <button
+                onClick={handleCloseResenasModal}
+                className="flex items-center gap-2 text-gray-700 hover:text-gray-900"
+              >
+                <ArrowLeft className="w-5 h-5" />
+                Regresar
+              </button>
+              <h2 className="text-xl font-bold text-gray-900">Reseñas</h2>
+              <div className="w-20"></div>
+            </div>
+
+            <div className="p-6">
+              {/* Recuadro con promedio de estrellas */}
+              <div className="bg-gray-50 rounded-lg p-6 mb-6 flex items-center justify-between">
+                <div className="flex items-center gap-4">
+                  <div className="w-20 h-20 rounded-full bg-emerald-500 flex items-center justify-center">
+                    <span className="text-3xl font-bold text-white">{calcularPromedioEstrellas()}</span>
+                  </div>
+                  <div className="flex">
+                    {[1, 2, 3, 4, 5].map((star) => (
+                      <Star
+                        key={star}
+                        className={`w-6 h-6 ${
+                          star <= Math.round(calcularPromedioEstrellas()) ? 'text-black fill-black' : 'text-gray-300'
+                        }`}
+                      />
+                    ))}
+                  </div>
+                </div>
+                <h3 className="text-xl font-bold text-gray-900">Tu reputación en VeciRed</h3>
+              </div>
+
+              {/* Título Comentarios */}
+              <h3 className="text-xl font-bold text-gray-900 mb-4">Comentarios</h3>
+
+              {/* Lista de comentarios */}
+              {resenas.length === 0 ? (
+                <p className="text-gray-500 text-center py-8">No hay reseñas aún.</p>
+              ) : (
+                <div className="space-y-4">
+                  {resenas.map((resena) => (
+                    <div key={resena.id} className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                      <div className="flex items-start mb-3">
+                        {resena.perfiles?.foto_url && (
+                          <img
+                            src={resena.perfiles.foto_url}
+                            alt={resena.perfiles.nombre_completo}
+                            className="w-10 h-10 rounded-full object-cover mr-3"
+                          />
+                        )}
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2">
+                            <h4 className="font-semibold text-gray-900">{resena.perfiles?.nombre_completo}</h4>
+                            <span className="text-sm text-gray-500">
+                              {new Date(resena.fecha_creacion).toLocaleDateString('es-ES', {
+                                year: 'numeric',
+                                month: 'long',
+                                day: 'numeric'
+                              })}
+                            </span>
+                          </div>
+                          <p className="text-sm text-gray-600">{resena.publicaciones?.titulo}</p>
+                        </div>
+                        <div className="flex">
+                          {[1, 2, 3, 4, 5].map((star) => (
+                            <Star
+                              key={star}
+                              className={`w-4 h-4 ${
+                                star <= resena.calificacion ? 'text-black fill-black' : 'text-gray-300'
+                              }`}
+                            />
+                          ))}
+                        </div>
+                      </div>
+                      {resena.comentario && (
+                        <p className="text-gray-700 text-sm">{resena.comentario}</p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         </div>
