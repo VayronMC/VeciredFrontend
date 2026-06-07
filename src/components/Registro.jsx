@@ -98,7 +98,7 @@ const Registro = ({ onSwitchToLogin }) => {
           {/* Logo */}
           <div className="text-center mb-6">
             <img 
-              src="/src/assets/logo.png" 
+              src="/logo.png" 
               alt="VeciRed Logo" 
               className="mx-auto h-16 w-auto mb-4"
             />
