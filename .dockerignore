@@ -1,0 +1,10 @@
+node_modules
+dist
+.env
+.git
+.github
+playwright-report
+test-results
+e2e-evidence
+*.md
+npm-debug.log*

@@ -63,6 +63,11 @@ function App() {
   };
 
   const handleLogout = () => {
+    const userInfo = sessionStorage.getItem('user_data');
+    if (userInfo) {
+      const user = JSON.parse(userInfo);
+      localStorage.removeItem(`readNotificationIds_${user.id}`);
+    }
     sessionStorage.removeItem('access_token');
     sessionStorage.removeItem('refresh_token');
     sessionStorage.removeItem('user_data');
